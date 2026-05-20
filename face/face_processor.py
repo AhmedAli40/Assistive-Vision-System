@@ -72,6 +72,13 @@ class FaceProcessor:
         self._votes : dict = {}   # { grid_key: [name, ...] }
         self._vsize = 7
 
+        # Pre-computed gamma LUT (1/1.5 gamma for low-light boost)
+        # Computed once here instead of every frame
+        self._gamma_lut = np.array(
+            [(i / 255.0) ** (1.0 / 1.5) * 255 for i in range(256)],
+            dtype=np.uint8
+        )
+
     def _warmup(self):
         print("[FaceProc] Loading Facenet512... (first run ~30s)")
         try:
@@ -87,9 +94,8 @@ class FaceProcessor:
     def detect(self, frame: np.ndarray) -> List[Tuple]:
         """Haar detection — سريع ~5ms"""
         g = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-        # Gamma correction لتحسين الإضاءة المنخفضة
-        t = np.array([(i/255)**(1/1.5)*255 for i in range(256)], np.uint8)
-        g = cv2.LUT(g, t)
+        # Gamma correction — uses pre-computed LUT (computed once in __init__)
+        g = cv2.LUT(g, self._gamma_lut)
         f = self._cascade.detectMultiScale(
             g, scaleFactor=1.1, minNeighbors=4,
             minSize=(45, 45)   # أصغر حجم للكشف عن الوجوه البعيدة
@@ -172,8 +178,11 @@ class FaceProcessor:
                 continue
             stored = np.array(rec.embeddings)      # (N, 512)
             dists  = 1.0 - (stored @ emb)          # cosine distance
-            top5   = sorted(dists)[:min(5,len(dists))]
-            avg    = float(np.mean(top5))
+            top5   = sorted(dists)[:min(5, len(dists))]
+            # Weighted average — closer matches have more influence
+            weights = [1.0 / (d + 1e-6) for d in top5]
+            w_sum   = sum(weights)
+            avg     = float(sum(d * w / w_sum for d, w in zip(top5, weights)))
             if avg < dist:
                 dist, best = avg, name
 
@@ -226,7 +235,8 @@ class FaceProcessor:
     def _grid_key(box) -> str:
         if not box: return "0_0"
         x, y, w, h = box
-        return f"{(x+w//2)//220}_{(y+h//2)//160}"
+        # Finer grid (80px cells) — avoids merging two nearby faces
+        return f"{(x+w//2)//80}_{(y+h//2)//80}"
 
     def reset(self):
         self._votes.clear()

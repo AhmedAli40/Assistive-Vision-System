@@ -1,0 +1,27 @@
+{
+  "models": [
+    "cnn_v3_final.h5",
+    "cnn_v6_final.h5"
+  ],
+  "weights": [
+    0.9,
+    0.09999999999999998
+  ],
+  "img_size": 48,
+  "color_mode": "grayscale",
+  "emotions": [
+    "angry",
+    "disgust",
+    "fear",
+    "happy",
+    "neutral",
+    "sad",
+    "surprise"
+  ],
+  "accuracy": {
+    "v3_standard": 0.7924893534649632,
+    "v6_standard": 0.7209639953542393,
+    "ensemble_standard": 0.7928765001935734,
+    "ensemble_tta": 0.8134920634920635
+  }
+}

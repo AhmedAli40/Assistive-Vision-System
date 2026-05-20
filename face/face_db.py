@@ -4,6 +4,10 @@ from dataclasses import dataclass, field
 from typing import Dict, List
 import numpy as np
 
+# Max embeddings stored per person — keeps RAM bounded
+# Old embeddings are dropped (FIFO) when limit is exceeded
+MAX_EMBEDDINGS = 120
+
 logger = logging.getLogger(__name__)
 
 
@@ -25,6 +29,9 @@ class FaceDB:
             if name not in self._db:
                 self._db[name] = FaceRecord(name=name)
             self._db[name].embeddings.extend(embeddings)
+            # Keep only the most recent MAX_EMBEDDINGS — prevents unbounded RAM growth
+            if len(self._db[name].embeddings) > MAX_EMBEDDINGS:
+                self._db[name].embeddings = self._db[name].embeddings[-MAX_EMBEDDINGS:]
             self._save()
         print(f"[DB] '{name}' — {len(self._db[name].embeddings)} embeddings total")
 
